@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace ChatBot_Final.ConsoleLogic
 {
-    public static class CybersecurityResponder
+    public static class Responder
     {
         private static readonly Random _random = new();
 

@@ -1,13 +1,13 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Threading.Tasks;
-using ChatBot_Final.ConsoleLogic; // Ensure your logic classes (AsciiArtDisplay, Audio, etc.) are in this namespace
-using System.Windows.Documents;
-using System.Windows.Media;
-using ChatBot_Final.Models;
 using System.Text.RegularExpressions;
-
+using ChatBot_Final.ConsoleLogic;
+using ChatBot_Final.Models;
+using System.Windows.Media;
+using System.Threading.Tasks;
 
 namespace ChatBot_Final
 {
@@ -18,6 +18,10 @@ namespace ChatBot_Final
         private bool running = true;
         private bool nameCaptured = false;
         private TaskItem pendingTask = null;
+        private bool awaitingReminderResponse = false;
+        private bool awaitingReminderTime = false;
+        private List<string> ActionLog = new(); 
+        private const int MaxLogEntriesToShow = 10;
 
         public MainWindow()
         {
@@ -27,11 +31,8 @@ namespace ChatBot_Final
 
         private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
-            // Simulate full console behavior on WPF start
             AsciiArtDisplay.Show(ChatStack);
             Audio.PlayWelcomeAudio();
-
-            // Ask user for name in chat box
             AddBotMessage("Please Enter your name to begin.");
         }
 
@@ -41,7 +42,6 @@ namespace ChatBot_Final
             txtUserInput.Clear();
 
             if (string.IsNullOrEmpty(input)) return;
-
             AddUserMessage(input);
 
             // Step 1: Capture user name
@@ -50,80 +50,137 @@ namespace ChatBot_Final
                 userName = input;
                 nameCaptured = true;
                 UserInteraction.WelcomeUser(userName, ChatStack);
-                AddBotMessage($"{userName}, ask me about cybersecurity (or type 'exit')");
+                AddBotMessage($"{userName}, ask me about cybersecurity or give me a task (or type 'exit').");
                 return;
             }
 
-            // Step 2: Handle exit
-            if (input.Equals("exit", StringComparison.OrdinalIgnoreCase) ||
-                input.Equals("quit", StringComparison.OrdinalIgnoreCase) ||
-                input.Equals("bye", StringComparison.OrdinalIgnoreCase))
+            // Step 2: Exit handling
+            if (Regex.IsMatch(input, @"\b(exit|quit|bye)\b", RegexOptions.IgnoreCase))
             {
                 running = false;
                 UserInteraction.Farewell(ChatStack);
                 return;
             }
 
-            // Step 3: Add task via chatbot
-            if (input.ToLower().StartsWith("add task -"))
+            // Step 3: Handle Yes/No for reminder
+            if (awaitingReminderResponse && pendingTask != null)
             {
-                string raw = input.Substring(10).Trim();
-
-                if (!string.IsNullOrEmpty(raw))
+                if (input.ToLower().Contains("yes"))
                 {
-                    string fullDescription = $"{raw} to ensure your data is protected.";
-                    pendingTask = new TaskItem
-                    {
-                        Title = "Cybersecurity Task",
-                        Description = fullDescription,
-                        IsCompleted = false
-                    };
-
-                    AddBotMessage($"Task added with the description \"{fullDescription}\". Would you like a reminder?");
+                    AddBotMessage("Great! When should I remind you? (e.g., in 3 days, in 1 week)");
+                    awaitingReminderResponse = false;
+                    awaitingReminderTime = true;
+                    return;
                 }
-                else
+                else if (input.ToLower().Contains("no"))
                 {
-                    AddBotMessage("Please include a task description after 'Add task -'.");
+                    AddBotMessage("Okay! No reminder set.");
+                    TaskWindow.PendingTasks.Add(pendingTask);
+                    LogAction($"Task added: '{pendingTask.Description}' (no reminder).");
+                    pendingTask = null;
+                    awaitingReminderResponse = false;
+                    return;
                 }
-                return;
             }
 
-            // Step 4: Handle reminder command
-            if (pendingTask != null && Regex.IsMatch(input.ToLower(), @"remind me in \d+ (day|days|week|weeks)"))
+            // Step 4: Set actual reminder time
+            if (awaitingReminderTime && pendingTask != null)
             {
-                var match = Regex.Match(input.ToLower(), @"remind me in (\d+)\s+(day|days|week|weeks)");
-
+                var match = Regex.Match(input.ToLower(), @"in (\d+) (day|days|week|weeks)");
                 if (match.Success)
                 {
                     int amount = int.Parse(match.Groups[1].Value);
                     string unit = match.Groups[2].Value;
-                    DateTime reminderDate = unit.StartsWith("week")
-                        ? DateTime.Now.AddDays(amount * 7)
-                        : DateTime.Now.AddDays(amount);
+                    DateTime reminderDate = unit.StartsWith("week") ? DateTime.Now.AddDays(amount * 7) : DateTime.Now.AddDays(amount);
 
                     pendingTask.ReminderDate = reminderDate;
-
-                    // Save the task to the global task list in TaskWindow
                     TaskWindow.PendingTasks.Add(pendingTask);
-
+                    LogAction($"Reminder set for '{pendingTask.Description}' in {amount} {unit}.");
                     AddBotMessage($"Got it! I'll remind you in {amount} {unit}.");
-
                     pendingTask = null;
+                    awaitingReminderTime = false;
+                    return;
                 }
                 else
                 {
-                    AddBotMessage("Sorry, I couldn’t understand the reminder format. Try: 'Remind me in 3 days'.");
+                    AddBotMessage("Sorry, I didn’t catch that. Try something like 'in 3 days' or 'in 1 week'.");
+                    return;
                 }
+            }
+
+            // Step 5: Detect intent
+            var intent = NLPIntentDetector.DetectIntent(input);
+
+            if (intent != null)
+            {
+                if (intent.IntentType == "add_task")
+                {
+                    pendingTask = new TaskItem
+                    {
+                        Title = "Cybersecurity Task",
+                        Description = intent.Description,
+                        IsCompleted = false
+                    };
+
+                    if (intent.ReminderDays.HasValue)
+                    {
+                        pendingTask.ReminderDate = DateTime.Now.AddDays(intent.ReminderDays.Value);
+                        TaskWindow.PendingTasks.Add(pendingTask);
+                        LogAction($"Reminder set for '{pendingTask.Description}' in {intent.ReminderDays} day(s).");
+                        AddBotMessage($"Reminder set for '{pendingTask.Description}' in {intent.ReminderDays} day(s).");
+                        pendingTask = null;
+                    }
+                    else
+                    {
+                        AddBotMessage($"Task added: '{pendingTask.Description}'. Would you like to set a reminder?");
+                        awaitingReminderResponse = true;
+                    }
+                    return;
+                }
+
+                if (intent.IntentType == "start_quiz")
+                {
+                    AddBotMessage("Launching cybersecurity quiz...");
+                    OpenQuiz_Click(sender, e);
+                    return;
+                }
+
+                if (intent.IntentType == "list_topics")
+                {
+                    AddBotMessage("I can help with:\n- Cybersecurity tips\n- Task creation\n- Reminders\n- Quiz\nAsk me!");
+                    return;
+                }
+            }
+
+            // Step 6: View actions
+            if (Regex.IsMatch(input.ToLower(), @"(activity log|what have you done|show log|log of actions)"))
+            {
+                if (ActionLog.Any())
+                {
+                    AddBotMessage("Here’s a summary of recent actions:");
+
+                    var recentActions = ActionLog
+                        .TakeLast(MaxLogEntriesToShow)
+                        .Select((entry, index) => $"{index + 1}. {entry}");
+
+                    foreach (var action in recentActions)
+                        AddBotMessage(action);
+                }
+                else
+                {
+                    AddBotMessage("There’s nothing in the log yet. Try adding a task or starting the quiz.");
+                }
+
                 return;
             }
 
-            // Step 5: Fallback to cybersecurity response
+            // Step 7: Fallback to Responder
             UserInteraction.DrawBorder(ChatStack);
 
             string response;
             try
             {
-                response = CybersecurityResponder.GetResponse(input, context);
+                response = Responder.GetResponse(input, context);
             }
             catch
             {
@@ -133,39 +190,43 @@ namespace ChatBot_Final
             await TextEffects.TypeWriter(response, ChatStack);
         }
 
+
+
         // === UI Helpers ===
         private void AddUserMessage(string message)
         {
-            var text = new TextBlock
+            ChatStack.Children.Add(new TextBlock
             {
                 Text = $"You: {message}",
                 Foreground = Brushes.LightGreen,
                 Margin = new Thickness(5)
-            };
-            ChatStack.Children.Add(text);
+            });
         }
 
         private void AddBotMessage(string message)
         {
-            var text = new TextBlock
+            ChatStack.Children.Add(new TextBlock
             {
                 Text = $"Bot: {message}",
                 Foreground = Brushes.LightCyan,
                 Margin = new Thickness(5)
-            };
-            ChatStack.Children.Add(text);
+            });
+        }
+
+        private void LogAction(string message)
+        {
+            string timestamp = DateTime.Now.ToString("HH:mm:ss");
+            ActionLog.Add($"[{timestamp}] {message}");
         }
 
         private void OpenTaskWindow_Click(object sender, RoutedEventArgs e)
         {
-            TaskWindow taskWindow = new TaskWindow();
-            taskWindow.Show();
+            new TaskWindow().Show();
         }
 
         private void OpenQuiz_Click(object sender, RoutedEventArgs e)
         {
-            QuizWindow quizWindow = new QuizWindow();
-            quizWindow.Show();
+            new QuizWindow().Show();
         }
     }
 }
