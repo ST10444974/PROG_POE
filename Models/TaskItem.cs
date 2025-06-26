@@ -18,6 +18,7 @@ namespace ChatBot_Final.Models
             string status = IsCompleted ? "[✔]" : "[ ]";
             string reminder = ReminderDate.HasValue ? $" (Remind: {ReminderDate.Value.ToShortDateString()})" : "";
             return $"{status} {Title} - {Description}{reminder}";
+
         }
     }
 }
