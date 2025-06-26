@@ -21,7 +21,7 @@ namespace ChatBot_Final.ConsoleLogic
         };
 
         // Top-level mapping of keyword sets to response-generators
-        private static readonly List<(string[] Keywords, Func<ConversationContext, string> Handler)> Topics
+        private static readonly List<(string[] Keywords, Func<ContextTracker, string> Handler)> Topics
             = new()
         {
             // Greetings & meta
@@ -122,7 +122,7 @@ namespace ChatBot_Final.ConsoleLogic
                 ctx => "Goodbye! Stay safe out there.")
         };
 
-        public static string GetResponse(string input, ConversationContext context)
+        public static string GetResponse(string input, ContextTracker context)
         {
             // Sentiment detection
             foreach (var kv in SentimentOpeners)
@@ -133,7 +133,7 @@ namespace ChatBot_Final.ConsoleLogic
             return GetCoreResponse(input, context);
         }
 
-        private static string GetCoreResponse(string input, ConversationContext context)
+        private static string GetCoreResponse(string input, ContextTracker context)
         {
             var clean = Regex.Replace(input.ToLower(), @"[^\w\s'-]", "");
 
@@ -203,7 +203,7 @@ namespace ChatBot_Final.ConsoleLogic
         private static string RandomPick(string[] options)
             => options[_random.Next(options.Length)];
 
-        private static string GetFollowUp(ConversationContext ctx)
+        private static string GetFollowUp(ContextTracker ctx)
         {
             // Increment follow-up counter
             ctx.FollowUpCount++;
