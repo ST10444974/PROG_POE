@@ -18,7 +18,7 @@ namespace ChatBot_Final
 
     public partial class TaskWindow : Window
     {
-        private List<TaskItem> tasks = new List<TaskItem>();
+        public static List<TaskItem> PendingTasks = new List<TaskItem>();
 
         public TaskWindow()
         {
@@ -42,7 +42,7 @@ namespace ChatBot_Final
                 IsCompleted = false
             };
 
-            tasks.Add(task);
+            PendingTasks.Add(task);
             ClearInputs();
             RefreshTaskList();
         }
@@ -51,7 +51,7 @@ namespace ChatBot_Final
         {
             if (lstTasks.SelectedIndex >= 0)
             {
-                tasks[lstTasks.SelectedIndex].IsCompleted = true;
+                PendingTasks[lstTasks.SelectedIndex].IsCompleted = true;
                 RefreshTaskList();
             }
         }
@@ -60,7 +60,7 @@ namespace ChatBot_Final
         {
             if (lstTasks.SelectedIndex >= 0)
             {
-                tasks.RemoveAt(lstTasks.SelectedIndex);
+                PendingTasks.RemoveAt(lstTasks.SelectedIndex);
                 RefreshTaskList();
             }
         }
@@ -68,7 +68,7 @@ namespace ChatBot_Final
         private void RefreshTaskList()
         {
             lstTasks.Items.Clear();
-            foreach (var task in tasks)
+            foreach (var task in PendingTasks)
             {
                 lstTasks.Items.Add(task.ToString());
             }

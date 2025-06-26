@@ -6,6 +6,8 @@ using ChatBot_Final.ConsoleLogic; // Ensure your logic classes (AsciiArtDisplay,
 using System.Windows.Documents;
 using System.Windows.Media;
 using ChatBot_Final.Models;
+using System.Text.RegularExpressions;
+
 
 namespace ChatBot_Final
 {
@@ -15,6 +17,7 @@ namespace ChatBot_Final
         private string userName = "";
         private bool running = true;
         private bool nameCaptured = false;
+        private TaskItem pendingTask = null;
 
         public MainWindow()
         {
@@ -41,7 +44,7 @@ namespace ChatBot_Final
 
             AddUserMessage(input);
 
-            // First input = Name
+            // Step 1: Capture user name
             if (!nameCaptured)
             {
                 userName = input;
@@ -51,7 +54,7 @@ namespace ChatBot_Final
                 return;
             }
 
-            // Handle exit commands
+            // Step 2: Handle exit
             if (input.Equals("exit", StringComparison.OrdinalIgnoreCase) ||
                 input.Equals("quit", StringComparison.OrdinalIgnoreCase) ||
                 input.Equals("bye", StringComparison.OrdinalIgnoreCase))
@@ -61,14 +64,60 @@ namespace ChatBot_Final
                 return;
             }
 
-            // Handle empty input
-            if (string.IsNullOrWhiteSpace(input))
+            // Step 3: Add task via chatbot
+            if (input.ToLower().StartsWith("add task -"))
             {
-                AddBotMessage("Please enter something to continue.");
+                string raw = input.Substring(10).Trim();
+
+                if (!string.IsNullOrEmpty(raw))
+                {
+                    string fullDescription = $"{raw} to ensure your data is protected.";
+                    pendingTask = new TaskItem
+                    {
+                        Title = "Cybersecurity Task",
+                        Description = fullDescription,
+                        IsCompleted = false
+                    };
+
+                    AddBotMessage($"Task added with the description \"{fullDescription}\". Would you like a reminder?");
+                }
+                else
+                {
+                    AddBotMessage("Please include a task description after 'Add task -'.");
+                }
                 return;
             }
 
-            // Draw border before each new interaction
+            // Step 4: Handle reminder command
+            if (pendingTask != null && Regex.IsMatch(input.ToLower(), @"remind me in \d+ (day|days|week|weeks)"))
+            {
+                var match = Regex.Match(input.ToLower(), @"remind me in (\d+)\s+(day|days|week|weeks)");
+
+                if (match.Success)
+                {
+                    int amount = int.Parse(match.Groups[1].Value);
+                    string unit = match.Groups[2].Value;
+                    DateTime reminderDate = unit.StartsWith("week")
+                        ? DateTime.Now.AddDays(amount * 7)
+                        : DateTime.Now.AddDays(amount);
+
+                    pendingTask.ReminderDate = reminderDate;
+
+                    // Save the task to the global task list in TaskWindow
+                    TaskWindow.PendingTasks.Add(pendingTask);
+
+                    AddBotMessage($"Got it! I'll remind you in {amount} {unit}.");
+
+                    pendingTask = null;
+                }
+                else
+                {
+                    AddBotMessage("Sorry, I couldn’t understand the reminder format. Try: 'Remind me in 3 days'.");
+                }
+                return;
+            }
+
+            // Step 5: Fallback to cybersecurity response
             UserInteraction.DrawBorder(ChatStack);
 
             string response;
@@ -76,12 +125,11 @@ namespace ChatBot_Final
             {
                 response = CybersecurityResponder.GetResponse(input, context);
             }
-            catch (Exception)
+            catch
             {
                 response = "Oops—something went wrong on my end. Can you try rephrasing?";
             }
 
-            // Typewriter text effect in chat
             await TextEffects.TypeWriter(response, ChatStack);
         }
 
