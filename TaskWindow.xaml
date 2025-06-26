@@ -1,0 +1,36 @@
+﻿<Window x:Class="ChatBot_Final.TaskWindow"
+               xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cybersecurity Task Assistant" Height="500" Width="750">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Task Input Form -->
+        <StackPanel Orientation="Vertical" Margin="0,0,0,10">
+            <TextBlock Text="Task Title:" Margin="0,0,0,2"/>
+            <TextBox x:Name="txtTitle" Margin="0,0,0,5" />
+
+            <TextBlock Text="Task Description:" Margin="0,5,0,2"/>
+            <TextBox x:Name="txtDescription" Margin="0,0,0,5" />
+
+            <TextBlock Text="Reminder Date (optional):" Margin="0,5,0,2"/>
+            <DatePicker x:Name="dpReminder" Margin="0,0,0,5"/>
+
+            <Button Content="Add Task" Click="AddTask_Click" Margin="0,5,0,0"/>
+        </StackPanel>
+
+
+        <!-- Task List -->
+        <ListBox x:Name="lstTasks" Grid.Row="1" Margin="0,10,0,10" />
+
+        <!-- Action Buttons -->
+        <StackPanel Orientation="Horizontal" Grid.Row="2" HorizontalAlignment="Right">
+            <Button Content="Mark as Complete" Click="CompleteTask_Click" Margin="0,0,10,0"/>
+            <Button Content="Delete Task" Click="DeleteTask_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
