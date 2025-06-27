@@ -1,4 +1,4 @@
-name: C# Build and Syntax Check
+name: C# WPF Build and Syntax Check
 
 on:
   push:
@@ -8,22 +8,23 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-     
-      - name: Setup SDK
+
+      - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0
+          dotnet-version: 9.0.x
 
       - name: Restore Dependencies
         run: dotnet restore
 
-      - name: Unit Tests
-        run: dotnet test
-
-      - name: Build
+      - name: Build WPF Project
         run: dotnet build --configuration Release
+
+      - name: Run Unit Tests (if applicable)
+        run: dotnet test
+        
