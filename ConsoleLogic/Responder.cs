@@ -11,348 +11,491 @@ namespace ChatBot_Final.ConsoleLogic
     public static class Responder
     {
         private static readonly Random _random = new();
+        private const int MaxFollowUps = 3;
 
-        // Sentiment prefix map
-        private static readonly Dictionary<string, string> SentimentOpeners = new()
+        // Enhanced sentiment handling with tone matching
+        private static readonly Dictionary<string, (string Opener, string Tone)> SentimentMap = new()
         {
-            { "worried",    "I understand—it can feel worrying, but heres a usefull tip to take note of: " },
-            { "frustrated", "I hear your frustration. heres a tip to help with your frustation:  " },
-            { "curious",    "Great question—curiosity is key to security. so let me give you a helpfull tip: " }
+            { "worried",    ("I understand why you'd feel concerned about {topic}. ", "reassuring") },
+            { "frustrated", ("Dealing with {topic} can be frustrating—let's break this down. ", "patient") },
+            { "confused",   ("{topic} can be confusing at first. Here's a clear explanation: ", "simplifying") },
+            { "curious",    ("Great question about {topic}! Let me share some insights: ", "enthusiastic") },
+            { "urgent",     ("For urgent {topic} issues, here's what you need to know immediately: ", "direct") }
         };
 
-        // Top-level mapping of keyword sets to response-generators
-        private static readonly List<(string[] Keywords, Func<ContextTracker, string> Handler)> Topics
-            = new()
+        // Comprehensive topic knowledge base
+        private static readonly Dictionary<string, TopicProfile> TopicDatabase = new()
         {
-            // Greetings & meta
-            (new[]{ "hello","hi","hey" },
-                ctx => "Hello! How can I help you with cybersecurity today?"),
+            ["password"] = new TopicProfile(
+                keywords: new[] { "password", "credentials", "login", "passphrase", "vault", "manager" },
+                baseTips: new[] {
+                    "Use passphrases ≥ 14 characters—mix unrelated words with digits & symbols",
+                    "Never reuse passwords across accounts - password managers solve this",
+                    "Enable 2FA as an additional layer beyond passwords",
+                    "Rotate critical passwords after breach notifications",
+                    "Avoid personal info that hackers could easily guess"
+                },
+                deepDives: new[] {
+                    new[] {
+                        "Use password manager generators for truly random credentials",
+                        "Enable biometric unlock for secure mobile access to your vault",
+                        "Conduct quarterly password audits to identify weak/reused credentials"
+                    },
+                    new[] {
+                        "Configure auto-fill only on trusted sites to prevent MITB attacks",
+                        "Maintain separate vaults for sensitive vs regular accounts",
+                        "Set up emergency access contacts for account recovery"
+                    },
+                    new[] {
+                        "Implement passwordless authentication with FIDO2 security keys where possible",
+                        "Use hardware-secured vaults for enterprise credential management",
+                        "Deploy breach monitoring services that alert you of compromised credentials"
+                    }
+                },
+                levels: new Dictionary<string, string[]>
+                {
+                    ["beginner"] = new[] {
+                        "Start with 3 random words + number/symbol (e.g., Apple$Sky42Turtle)",
+                        "Browser-based password managers are great for beginners"
+                    },
+                    ["intermediate"] = new[] {
+                        "Use diceware method for true random passphrases",
+                        "Consider open-source managers like Bitwarden for transparency"
+                    },
+                    ["advanced"] = new[] {
+                        "Implement hardware security keys for critical accounts",
+                        "Set up enterprise-grade solutions like 1Password for Teams"
+                    }
+                }
+            ),
 
-            (new[]{ "how are you","how's it going" },
-                ctx => "I'm doing great—ready to keep you safe online!"),
+            ["phishing"] = new TopicProfile(
+                keywords: new[] { "phishing", "scam", "email", "sms", "spoof", "spear", "fraud" },
+                baseTips: new[] {
+                    "Verify sender addresses - mismatched domains are red flags",
+                    "Hover over links before clicking to see actual destinations",
+                    "Legitimate organizations never pressure for immediate action",
+                    "Use anti-phishing extensions like Cloudphish or Avira",
+                    "Report suspicious messages to your security team immediately"
+                },
+                deepDives: new[] {
+                    new[] {
+                        "Inspect email headers for mismatched paths or forged SPF records",
+                        "Use sandbox environments to safely analyze suspicious attachments",
+                        "Conduct quarterly phishing simulations for your team"
+                    },
+                    new[] {
+                        "Monitor DMARC reports to detect spoofing attempts on your domain",
+                        "Implement link-analysis tools that render pages in isolation",
+                        "Deploy AI-powered filters that detect spear-phishing patterns"
+                    },
+                    new[] {
+                        "Set up canary tokens to detect credential harvesting attempts",
+                        "Implement DMARC policy with quarantine/reject settings",
+                        "Use email authentication protocols like BIMI for brand verification"
+                    }
+                },
+                levels: new Dictionary<string, string[]>
+                {
+                    ["beginner"] = new[] {
+                        "Look for spelling mistakes and poor grammar as warning signs",
+                        "When in doubt, contact the organization through official channels"
+                    },
+                    ["intermediate"] = new[] {
+                        "Check for subtle domain spoofs (e.g., micros0ft.com with zero)",
+                        "Verify unexpected attachments through separate communication channels"
+                    },
+                    ["advanced"] = new[] {
+                        "Implement S/MIME or PGP email encryption for sensitive communications",
+                        "Deploy advanced threat protection with URL detonation capabilities"
+                    }
+                }
+            ),
 
-            (new[]{ "purpose","why are you here" },
-                ctx => "I’m here to guide you through cybersecurity best practices."),
+            ["privacy"] = new TopicProfile(
+                keywords: new[] { "privacy", "gdpr", "data", "personal", "pii", "compliance" },
+                baseTips: new[] {
+                    "Review app permissions monthly—revoke unused access",
+                    "Use encrypted messaging apps like Signal for sensitive conversations",
+                    "Limit personal info shared on social media platforms",
+                    "Enable full-disk encryption on all devices",
+                    "Use VPNs on public Wi-Fi to encrypt your traffic"
+                },
+                deepDives: new[] {
+                    new[] {
+                        "Configure privacy settings using tools like Privacy Badger or DuckDuckGo",
+                        "Use browser containers to isolate tracking between sites",
+                        "Review privacy policies before sharing data with new services"
+                    },
+                    new[] {
+                        "Implement data minimization principles in your workflows",
+                        "Conduct periodic data audits to identify PII exposure risks",
+                        "Use pseudonymization techniques for user data storage"
+                    },
+                    new[] {
+                        "Deploy data loss prevention (DLP) solutions for sensitive data",
+                        "Implement GDPR-compliant consent management systems",
+                        "Use differential privacy techniques for analytics data"
+                    }
+                },
+                levels: new Dictionary<string, string[]>
+                {
+                    ["beginner"] = new[] {
+                        "Enable 'Do Not Track' in your browser settings",
+                        "Regularly clear cookies and browsing history"
+                    },
+                    ["advanced"] = new[] {
+                        "Implement homomorphic encryption for processing sensitive data",
+                        "Deploy privacy-enhancing computation techniques"
+                    }
+                }
+            ),
 
-            (new[]{ "topics","ask","questions" },
-                ctx => "Feel free to ask me about:\n" +
-                       "- Password safety\n- Phishing & scams\n- Safe browsing\n" +
-                       "- Malware protection\n- Privacy & GDPR\n- Two-factor auth (2FA)\n" +
-                       "- Encryption tips\n- Social engineering"),
+            ["malware"] = new TopicProfile(
+                keywords: new[] { "malware", "virus", "ransomware", "trojan", "spyware", "infection" },
+                baseTips: new[] {
+                    "Install reputable antivirus software and keep it updated",
+                    "Regularly patch operating systems and applications",
+                    "Avoid downloading software from untrusted sources",
+                    "Backup critical data using the 3-2-1 rule (3 copies, 2 media, 1 offsite)",
+                    "Use application whitelisting to block unauthorized software"
+                },
+                deepDives: new[] {
+                    new[] {
+                        "Enable behavior-based detection in your antivirus settings",
+                        "Use system restore points for quick recovery from infections",
+                        "Implement email attachment scanning for malware detection"
+                    },
+                    new[] {
+                        "Deploy endpoint detection and response (EDR) solutions",
+                        "Use network segmentation to contain malware spread",
+                        "Implement file integrity monitoring for critical systems"
+                    },
+                    new[] {
+                        "Set up honeypots to detect and analyze new malware variants",
+                        "Implement memory protection against code injection attacks",
+                        "Use threat intelligence feeds to block known malicious indicators"
+                    }
+                }
+            ),
 
-            // Password safety (5 random tips)
-            (new[]{ "password","passwords","credentials","login" },
-                ctx => RandomPick(new[]{
-                    "Use passphrases ≥ 14 characters—mix words, digits & symbols.",
-                    "Never reuse passwords. A password manager can generate & store them.",
-                    "Enable 2FA wherever possible to add an extra layer of security.",
-                    "Rotate critical passwords after any breach notifications.",
-                    "Avoid personal info in passwords; hackers can guess those easily."
-                })),
+            ["browsing"] = new TopicProfile(
+                keywords: new[] { "browsing", "internet", "online", "https", "ssl", "vpn", "browser" },
+                baseTips: new[] {
+                    "Always look for HTTPS and padlock icon before entering sensitive data",
+                    "Keep browsers and extensions updated to patch vulnerabilities",
+                    "Use privacy-focused browsers like Brave or Firefox with strict settings",
+                    "Avoid public Wi-Fi for sensitive activities without VPN protection",
+                    "Regularly clear cookies and cached data"
+                },
+                deepDives: new[] {
+                    new[] {
+                        "Enable strict site isolation in your browser settings",
+                        "Use DNS-over-HTTPS (DoH) to prevent DNS snooping",
+                        "Install content security policy (CSP) monitoring extensions"
+                    },
+                    new[] {
+                        "Configure browser security headers for enhanced protection",
+                        "Implement certificate pinning for critical services",
+                        "Use browser sandboxing features for risky activities"
+                    },
+                    new[] {
+                        "Deploy enterprise browser security policies via group policy",
+                        "Implement web application firewalls for enhanced protection",
+                        "Use remote browser isolation for high-risk browsing"
+                    }
+                }
+            )
+        };
 
-            // Phishing & scams (5 random tips)
-            (new[]{ "phishing","scam", "scams", "email","sms","spoof","spear" },
-                ctx => RandomPick(new[]{
-                    "Verify sender addresses; mismatched domains are red flags.",
-                    "Hover over links—if they don’t match displayed text, don’t click.",
-                    "Beware of urgent demands for info—legitimate orgs don’t pressure.",
-                    "Use anti-phishing toolbars/extensions in your browser.",
-                    "Report suspicious messages and delete them immediately."
-                })),
+        // Core topic response templates
+        private static readonly Dictionary<string, Func<ContextTracker, string>> TopicResponses = new()
+        {
+            ["hello"] = ctx => $"Hello{(ctx.UserName != null ? " " + ctx.UserName : "")}! How can I assist with cybersecurity today?",
 
-            // Privacy & GDPR (4 random tips)
-            (new[]{ "privacy","data","gdpr","personal" },
-                ctx => {
-                    var baseTips = new[]{
-                        "Review app permissions—revoke any you don’t use.",
-                        "Use encrypted messaging (Signal, WhatsApp with E2EE).",
-                        "Limit personal info on social networks and public forums.",
-                        "Enable disk-encryption on laptops and backups."
-                    };
-                    var tip = RandomPick(baseTips);
-                    // Personalize if user interest matches
-                    if (ctx.Memory.TryGetValue("interest", out var fav) && fav == "privacy")
-                        tip = "Since you’re keen on privacy: " + tip;
-                    return tip;
-                }),
+            ["how"] = ctx => "I'm functioning well—ready to help you navigate security challenges!",
 
-            // Safe browsing (3 random tips)
-            (new[]{ "browsing","internet","online","wifi","https" },
-                ctx => RandomPick(new[]{
-                    "Always look for HTTPS and the lock icon before entering data.",
-                    "Keep your browser & plugins up to date automatically.",
-                    "Use a privacy-focused extension (uBlock Origin / Privacy Badger)."
-                })),
+            ["purpose"] = ctx => "I'm designed to provide expert cybersecurity guidance tailored to your needs",
 
-            // Malware (4 random tips)
-            (new[]{ "malware","virus","ransomware","trojan","spyware" },
-                ctx => RandomPick(new[]{
-                    "Install reputable antivirus and run full scans weekly.",
-                    "Keep your OS & software patched to close vulnerabilities.",
-                    "Avoid downloading from unverified sources or torrents.",
-                    "Backup critical data offline in case of ransomware."
-                })),
+            ["topics"] = ctx => {
+                var interests = ctx.Memory.TryGetValue("interest", out var i) ? $" Since you're interested in {i}," : "";
+                return $"I specialize in:{interests}\n- Password security\n- Phishing defense\n- Secure browsing\n- Malware protection"
+                    + "\n- Privacy management\n- 2FA implementation\n- Encryption\n- Social engineering";
+            },
 
-            // Two-factor auth (2FA) (3 random tips)
-            (new[]{ "2fa","two-factor","mfa","authenticator" },
-                ctx => RandomPick(new[]{
-                    "Use an authenticator app (Authy, Google Authenticator) over SMS.",
-                    "Register backup codes securely in case you lose devices.",
-                    "Consider hardware tokens (YubiKey) for top-tier security."
-                })),
-
-            // Encryption (3 random tips)
-            (new[]{ "encryption","encrypt","ssl","tls","vpn" },
-                ctx => RandomPick(new[]{
-                    "Use a reputable VPN on public Wi-Fi to encrypt traffic.",
-                    "Enable full-disk encryption on mobile & desktop devices.",
-                    "Always check for HTTPS/TLS on websites handling sensitive data."
-                })),
-
-            // Social engineering (3 random tips)
-            (new[]{ "social","engineering","manipulation","pretext" },
-                ctx => RandomPick(new[]{
-                    "Verify identity over a known channel before sharing info.",
-                    "Be skeptical of unsolicited help requests—confirm authenticity.",
-                    "Train yourself on common tactics: impersonation, urgency, flattery."
-                })),
-
-            // Exit
-            (new[]{ "exit","quit","bye" },
-                ctx => "Goodbye! Stay safe out there.")
+            ["exit"] = ctx => "Stay secure! Feel free to return anytime you have security questions."
         };
 
         public static string GetResponse(string input, ContextTracker context)
         {
-            // Sentiment detection
-            foreach (var kv in SentimentOpeners)
+            // Detect and handle sentiment first
+            foreach (var (emotion, (opener, tone)) in SentimentMap)
             {
-                if (Regex.IsMatch(input, $@"\b{kv.Key}\b", RegexOptions.IgnoreCase))
-                    return kv.Value + GetCoreResponse(input, context);
+                if (Regex.IsMatch(input, $@"\b{emotion}\b", RegexOptions.IgnoreCase))
+                {
+                    var topic = DetectPrimaryTopic(input) ?? "this";
+                    var sentimentResponse = opener.Replace("{topic}", topic);
+                    context.CurrentTone = tone; // Track tone for follow-ups
+                    return sentimentResponse + GetCoreResponse(input, context);
+                }
             }
+
             return GetCoreResponse(input, context);
         }
 
         private static string GetCoreResponse(string input, ContextTracker context)
         {
-            var clean = Regex.Replace(input.ToLower(), @"[^\w\s'-]", "");
+            var cleanInput = SanitizeInput(input);
 
-            // Yes/No & “tell me more” handler
+            // Handle conversation flow states
             if (context.AwaitingConfirmation)
             {
-                if (Regex.IsMatch(clean, @"\b(yes|y|sure|tell me more|continue|more)\b"))
-                {
-                    var extra = GetFollowUp(context);
-                    return extra + "\n\nWould you like even more depth? (yes/no)";
-                }
-                if (Regex.IsMatch(clean, @"\b(no|n|not now)\b"))
-                {
-                    context.AwaitingConfirmation = false;
-                    context.CurrentTopic = null;
-                    return "Understood—what else can I help you with?";
-                }
+                return HandleConfirmation(cleanInput, context);
             }
 
-            // Memory capture
-            // Interest: “im interested in X” / “my favorite topic is X”
-            var m1 = Regex.Match(clean, @"\b(i am|i'm|im|my)\s+(interested in|favorite topic is)\s+([a-z-]+)\b");
-            if (m1.Success)
+            // Capture user context
+            if (TryCaptureUserContext(cleanInput, context))
             {
-                var topic = m1.Groups[3].Value;
-                context.Memory["interest"] = topic;
-                return $"Got it—I’ll remember you’re interested in {topic}.";
-            }
-            // Familiarity: “i am a beginner” / “i know a bit” / “advanced”
-            var m2 = Regex.Match(clean, @"\b(i am|i'm|im)\s+(a\s+)?(beginner|advanced|intermediate)\b");
-            if (m2.Success)
-            {
-                var level = m2.Groups[3].Value;
-                context.Memory["level"] = level;
-                return $"Thanks—I'll tailor my tips for a {level} level.";
+                return BuildContextResponse(context);
             }
 
-            // Topic matching 
-            foreach (var (keywords, handler) in Topics)
+            // Identify primary topic
+            var primaryTopic = DetectPrimaryTopic(cleanInput);
+            if (!string.IsNullOrEmpty(primaryTopic))
             {
-                if (keywords.Any(kw => Regex.IsMatch(clean, $@"\b{Regex.Escape(kw)}\b")))
+                return BuildTopicResponse(primaryTopic, context);
+            }
+
+            // Check for predefined topic responses
+            foreach (var (topic, handler) in TopicResponses)
+            {
+                if (Regex.IsMatch(cleanInput, $@"\b{Regex.Escape(topic)}\b"))
                 {
-                    context.CurrentTopic = keywords.First();
-                    var reply = handler(context);
-
-                    // Only core security topics prompt follow-up
-                    var noPrompt = new[] { "hello", "exit", "how are you", "purpose", "topics" };
-                    if (!noPrompt.Contains(context.CurrentTopic))
-                    {
-                        reply += "\n\nWould you like more details? (yes/no)";
-                        context.AwaitingConfirmation = true;
-                    }
-                    else
-                    {
-                        context.AwaitingConfirmation = false;
-                    }
-                    return reply;
+                    return handler(context);
                 }
             }
 
-            //  Clarification for unknown inputs 
-            return "I’m not sure I understand. Could you rephrase or pick one of my topics?";
+            // Clarification for unknown inputs with contextual suggestions
+            return GenerateClarificationResponse(context);
         }
 
-        #region Helpers
+        #region Core Processing Methods
 
-        private static string RandomPick(string[] options)
-            => options[_random.Next(options.Length)];
-
-        private static string GetFollowUp(ContextTracker ctx)
+        private static string SanitizeInput(string input)
         {
-            // Increment follow-up counter
-            ctx.FollowUpCount++;
-
-            // Predefined deep-dive tips per topic
-            var deepDives = new Dictionary<string, string[][]>
-            {
-                ["password"] = new[]
-                {
-            new[]
-            {
-                "Use a password manager’s built-in generator to create truly random credentials.",
-                "Enable biometric unlock on your manager so you can access passwords securely on mobile.",
-                "Regularly audit your vault for weak or reused passwords and replace them."
-            },
-            new[]
-            {
-                "Configure auto-fill only on trusted sites to avoid man-in-the-browser attacks.",
-                "Use a separate vault or profile for highly sensitive accounts (e.g., banking).",
-                "Set up emergency access contacts in your manager to recover locks."
-            }
-        },
-                ["phishing"] = new[]
-                {
-            new[]
-            {
-                "Inspect the email header: look for mismatched Received paths or forged SPF records.",
-                "Use a sandbox environment or web preview to open suspicious attachments safely.",
-                "Implement anti-phishing training simulations every quarter for your team."
-            },
-            new[]
-            {
-                "Check DMARC reports for your domain to see if attackers are spoofing you.",
-                "Deploy advanced link-analysis tools that render destination pages in isolation.",
-                "Use AI-powered filters to flag spear-phishing attempts based on writing style."
-            }
-        },
-                ["privacy"] = new[]
-                {
-            new[]
-            {
-                "Review your mobile apps’ permission logs monthly to spot new over-privileged installs.",
-                "Use a personal VPN when collecting data on research apps to mask your identity.",
-                "Enable multi-profile browsing (e.g., Firefox Containers) to isolate tracking."
-            },
-            new[]
-            {
-                "Check your social accounts’ download archive for past shared images and posts to delete anything sensitive.",
-                "Use a privacy audit tool (like Privacy Badger) to block third-party cookies automatically.",
-                "Consider self-hosting open-source alternatives (e.g., Nextcloud) for your files."
-            }
-        },
-                ["browsing"] = new[]
-                {
-            new[]
-            {
-                "Deploy a content-security policy (CSP) extension to block inline scripts and dangerous sources.",
-                "Use DNS-over-HTTPS (DoH) or DNS-over-TLS (DoT) to prevent DNS snooping on public Wi-Fi.",
-                "Enable strict site isolation in Chrome or Firefox to mitigate Spectre-style attacks."
-            },
-            new[]
-            {
-                "Configure your browser to delete cookies and cache on exit to limit persistent tracking.",
-                "Leverage browser CLI flags (e.g., `--incognito --disable-extensions`) for a clean session.",
-                "Use a hardened fork like LibreWolf if you need maximum privacy."
-            }
-        },
-                ["malware"] = new[]
-                {
-            new[]
-            {
-                "Set up automated rollback snapshots so you can revert an infected system instantly.",
-                "Use behavioral-analysis AV engines rather than signature-only scanners.",
-                "Whitelist applications to run only approved executables in sensitive environments."
-            },
-            new[]
-            {
-                "Implement network segmentation to limit ransomware spread in case of breach.",
-                "Use file-integrity monitoring (FIM) to detect unauthorized changes in real time.",
-                "Deploy honeypots to detect lateral movement and new malware variants early."
-            }
-        },
-                ["2fa"] = new[]
-                {
-            new[]
-            {
-                "Switch from SMS to TOTP apps to avoid SIM-swap attacks.",
-                "Backup your authenticator secrets in an encrypted offline vault.",
-                "Use hardware security keys (like YubiKey) for accounts that support WebAuthn."
-            },
-            new[]
-            {
-                "Enable push-based 2FA (e.g., Duo Push) for faster, phishing-resistant login.",
-                "Periodically review your list of 2FA devices and revoke old ones.",
-                "Combine device-based 2FA with biometric checks where supported."
-            }
-        },
-                ["encryption"] = new[]
-                {
-            new[]
-            {
-                "Use disk-level encryption (BitLocker, FileVault) and require pre-boot PINs.",
-                "Configure mail clients to use PGP or S/MIME for end-to-end email encryption.",
-                "Deploy SSL/TLS certificates from a trusted CA and automate renewal via ACME."
-            },
-            new[]
-            {
-                "Set up an encrypted container (e.g., VeraCrypt) for highly sensitive archives.",
-                "Use HTTPS-only browser extensions to enforce strong TLS on all sites.",
-                "Implement database-level encryption for sensitive fields (e.g., user SSNs, API keys)."
-            }
-        },
-                ["social"] = new[]
-                {
-            new[]
-            {
-                "Establish a verification protocol for any unsolicited requests for help or data.",
-                "Use voice-print or video ID checks for high-risk transactions or access requests.",
-                "Train staff with realistic role-play exercises covering pretexting, baiting, and tailgating."
-            },
-            new[]
-            {
-                "Maintain an up-to-date “who’s who” roster so employees can verify callers quickly.",
-                "Rotate social-engineering drills every quarter and debrief with real examples.",
-                "Deploy AI to flag anomalous internal messages that mimic executive style."
-            }
-        }
-                // Additional deep-dive mappings for other topics
-            };
-
-            // If topic found, choose appropriate level of detail
-            if (deepDives.TryGetValue(ctx.CurrentTopic, out var levels))
-            {
-                // Choose the appropriate level (0 or 1) based on follow-up count
-                int idx = Math.Min(ctx.FollowUpCount - 1, levels.Length - 1);
-                var tips = levels[idx];
-                var tip = RandomPick(tips);
-                return $"Here’s some deeper insight on {ctx.CurrentTopic}: {tip}";
-            }
-
-            // Generic fallback if no deep-dive mapping exists
-            return ctx.FollowUpCount switch
-            {
-                1 => $"Here’s some deeper insight on {ctx.CurrentTopic}: {RandomPick(new[]{
-                  "Deep security tip 1.", "Deep security tip 2.", "Deep security tip 3." })}",
-                _ => "I’ve shared quite a bit—let me know if you’d like to explore something else."
-            };
+            return Regex.Replace(input.ToLower(), @"[^\w\s'-]", "");
         }
 
+        private static string HandleConfirmation(string input, ContextTracker context)
+        {
+            if (Regex.IsMatch(input, @"\b(yes|y|sure|tell me more|continue|more)\b"))
+            {
+                if (context.FollowUpCount < MaxFollowUps)
+                {
+                    var followUp = GetFollowUp(context);
+                    return followUp + $"\n\nWould you like deeper technical details? ({context.FollowUpCount + 1}/{MaxFollowUps})";
+                }
+                return "I've shared comprehensive insights. Would you like to explore another topic?";
+            }
+
+            if (Regex.IsMatch(input, @"\b(no|n|not now|that's enough)\b"))
+            {
+                context.ResetConversationState();
+                return "Understood! What security topic would you like to discuss next?";
+            }
+
+            return "I wasn't clear on your response. Please answer yes/no or ask about another topic.";
+        }
+
+        private static bool TryCaptureUserContext(string input, ContextTracker context)
+        {
+            // Capture interest
+            var interestMatch = Regex.Match(input,
+                @"\b(i am|i'm|im|my)\s+(interested in|favorite topic is|focus on)\s+([a-z-]+)\b");
+            if (interestMatch.Success)
+            {
+                var topic = interestMatch.Groups[3].Value;
+                context.Memory["interest"] = topic;
+                return true;
+            }
+
+            // Capture expertise level
+            var levelMatch = Regex.Match(input,
+                @"\b(i am|i'm|im)\s+(a\s+)?(beginner|novice|intermediate|advanced|expert)\b");
+            if (levelMatch.Success)
+            {
+                var level = levelMatch.Groups[3].Value;
+                context.Memory["level"] = level;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static string BuildContextResponse(ContextTracker context)
+        {
+            var response = new StringBuilder("Noted! ");
+
+            if (context.Memory.TryGetValue("interest", out var interest))
+                response.Append($"I'll prioritize {interest}-related content. ");
+
+            if (context.Memory.TryGetValue("level", out var level))
+                response.Append($"Adjusting for {level} expertise. ");
+
+            response.Append("How can I assist with your security needs?");
+            return response.ToString();
+        }
+
+        private static string DetectPrimaryTopic(string input)
+        {
+            // Calculate topic relevance scores
+            var topicScores = new Dictionary<string, int>();
+            foreach (var (topic, profile) in TopicDatabase)
+            {
+                foreach (var keyword in profile.Keywords)
+                {
+                    if (Regex.IsMatch(input, $@"\b{Regex.Escape(keyword)}\b"))
+                    {
+                        if (!topicScores.ContainsKey(topic)) topicScores[topic] = 0;
+                        topicScores[topic]++;
+                    }
+                }
+            }
+
+            // Return highest scoring topic
+            return topicScores.Any()
+                ? topicScores.OrderByDescending(kv => kv.Value).First().Key
+                : null;
+        }
+
+        private static string BuildTopicResponse(string topic, ContextTracker context)
+        {
+            context.CurrentTopic = topic;
+            context.FollowUpCount = 0;
+
+            // Get base response
+            var response = new StringBuilder();
+
+            // Add personalized introduction if available
+            if (context.Memory.TryGetValue("interest", out var interest) && interest == topic)
+            {
+                response.Append($"Since you're interested in {topic}, ");
+            }
+
+            // Select appropriate tip based on user level
+            string selectedTip;
+            if (TopicDatabase.TryGetValue(topic, out var profile))
+            {
+                if (context.Memory.TryGetValue("level", out var level) &&
+                    profile.Levels.TryGetValue(level, out var levelTips))
+                {
+                    selectedTip = levelTips[_random.Next(levelTips.Length)];
+                }
+                else
+                {
+                    selectedTip = profile.BaseTips[_random.Next(profile.BaseTips.Length)];
+                }
+            }
+            else
+            {
+                selectedTip = "Here's important security information: " +
+                    (TopicResponses.ContainsKey(topic)
+                        ? TopicResponses[topic](context)
+                        : "Let's discuss this important security topic");
+            }
+
+            response.Append(selectedTip);
+
+            // Add follow-up prompt for security topics
+            if (!new[] { "hello", "exit", "how", "purpose", "topics" }.Contains(topic))
+            {
+                response.Append("\n\nWould you like more detailed information? (yes/no)");
+                context.AwaitingConfirmation = true;
+            }
+
+            return response.ToString();
+        }
+
+        private static string GenerateClarificationResponse(ContextTracker context)
+        {
+            var suggestions = new StringBuilder("I'm not quite sure what you're asking. ");
+
+            // Suggest based on conversation history
+            if (!string.IsNullOrEmpty(context.CurrentTopic))
+            {
+                suggestions.Append($"We were discussing {context.CurrentTopic}. ");
+                suggestions.Append("Would you like to continue with that topic?");
+                return suggestions.ToString();
+            }
+
+            // Suggest based on user interests
+            if (context.Memory.TryGetValue("interest", out var interest))
+            {
+                suggestions.Append($"Since you're interested in {interest}, you might ask about: ");
+                suggestions.Append(string.Join(", ", TopicDatabase[interest].Keywords.Take(3)));
+                return suggestions.ToString();
+            }
+
+            // Generic suggestions
+            suggestions.Append("Try asking about:\n- Password safety\n- Phishing detection\n- Privacy settings");
+            suggestions.Append("\nOr say 'help' to see all available topics");
+            return suggestions.ToString();
+        }
+
+        private static string GetFollowUp(ContextTracker context)
+        {
+            context.FollowUpCount++;
+
+            if (TopicDatabase.TryGetValue(context.CurrentTopic, out var profile) &&
+                context.FollowUpCount <= profile.DeepDives.Length)
+            {
+                var tips = profile.DeepDives[context.FollowUpCount - 1];
+                var tip = tips[_random.Next(tips.Length)];
+
+                // Apply tone from sentiment detection if available
+                var tonePrefix = !string.IsNullOrEmpty(context.CurrentTone)
+                    ? $"[Using {context.CurrentTone} approach] "
+                    : "";
+
+                return $"{tonePrefix}Deep dive #{context.FollowUpCount}: {tip}";
+            }
+
+            return context.FollowUpCount switch
+            {
+                1 => $"Advanced insight: {RandomPick(new[] {
+                    "Consider threat modeling for your specific use case",
+                    "Implement monitoring to detect related security events",
+                    "Review industry frameworks like NIST or ISO 27001"
+                })}",
+                _ => "I've shared comprehensive insights. Let's explore another topic or task?"
+            };
+        }
+
+        #endregion
+
+        #region Helper Classes & Methods
+
+        private class TopicProfile
+        {
+            public string[] Keywords { get; }
+            public string[] BaseTips { get; }
+            public string[][] DeepDives { get; }
+            public Dictionary<string, string[]> Levels { get; }
+
+            public TopicProfile(
+                string[] keywords,
+                string[] baseTips,
+                string[][] deepDives,
+                Dictionary<string, string[]> levels = null)
+            {
+                Keywords = keywords;
+                BaseTips = baseTips;
+                DeepDives = deepDives;
+                Levels = levels ?? new Dictionary<string, string[]>();
+            }
+        }
+
+        private static string RandomPick(string[] options) => options[_random.Next(options.Length)];
 
         #endregion
     }
