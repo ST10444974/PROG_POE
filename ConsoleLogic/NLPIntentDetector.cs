@@ -17,7 +17,7 @@ namespace ChatBot_Final.ConsoleLogic
             string lower = input.ToLower();
 
             // Match task commands like "add a task to ..." or "remind me to ..."
-            if (lower.Contains("remind me to") || lower.Contains("add a task to") || lower.Contains("set a reminder to"))
+            if (lower.Contains("remind me to") || lower.Contains("add a task") || lower.Contains("set a reminder to"))
             {
                 // Extract description
                 var match = Regex.Match(input, @"(remind me to|add a task to|set a reminder to)\s+(.+)", RegexOptions.IgnoreCase);
@@ -45,14 +45,30 @@ namespace ChatBot_Final.ConsoleLogic
                 }
             }
 
-            // Start quiz
-            if (lower.Contains("start quiz") || lower.Contains("launch quiz"))
+            // Advanced quiz detection with keyword co-occurrence
+            var tokens = lower.Split(new char[] { ' ', '.', ',', '!', '?' },
+                                    StringSplitOptions.RemoveEmptyEntries);
+
+            // Define keyword categories for quiz detection
+            var actionVerbs = new HashSet<string> { "start", "begin", "launch", "take", "commence" };
+            var quizNouns = new HashSet<string> { "quiz", "test", "exam", "assessment", "questions" };
+
+            // Check for co-occurrence of action verbs and quiz nouns
+            bool hasAction = tokens.Any(t => actionVerbs.Contains(t));
+            bool hasQuiz = tokens.Any(t => quizNouns.Contains(t));
+
+            if (hasAction && hasQuiz)
             {
                 return new NLPIntent { IntentType = "start_quiz" };
             }
 
-            // Ask what bot can do
-            if (lower.Contains("what can you do") || lower.Contains("help") || lower.Contains("topics"))
+            // Enhanced topic listing detection with token-based matching
+            var topicTriggers = new HashSet<string> { "help", "topics", "options", "what", "list" };
+            bool hasTopicTrigger = tokens.Any(t => topicTriggers.Contains(t)) ||
+                                  lower.Contains("what can you do") ||
+                                  lower.Contains("show commands");
+
+            if (hasTopicTrigger)
             {
                 return new NLPIntent { IntentType = "list_topics" };
             }

@@ -148,12 +148,13 @@ namespace ChatBot_Final
                 if (intent.IntentType == "list_topics")
                 {
                     AddBotMessage("I can help with:\n- Cybersecurity tips\n- Task creation\n- Reminders\n- Quiz\nAsk me!");
+                    LogAction("Displayed help topics via NLP intent.");
                     return;
                 }
             }
 
             // Step 6: View actions
-            if (Regex.IsMatch(input.ToLower(), @"(activity log|what have you done|show log|log of actions)"))
+            if (Regex.IsMatch(input.ToLower(), @"(activity log|what have you done|show log|show logs|log of actions)"))
             {
                 if (ActionLog.Any())
                 {
@@ -213,10 +214,15 @@ namespace ChatBot_Final
             });
         }
 
-        private void LogAction(string message)
+        public static void LogAction(string action)
         {
-            string timestamp = DateTime.Now.ToString("HH:mm:ss");
-            ActionLog.Add($"[{timestamp}] {message}");
+            string timestamped = $"{DateTime.Now:HH:mm} - {action}";
+            if (App.Current.MainWindow is MainWindow main)
+            {
+                if (main.ActionLog.Count >= 10)
+                    main.ActionLog.RemoveAt(0);
+                main.ActionLog.Add(timestamped);
+            }
         }
 
         private void OpenTaskWindow_Click(object sender, RoutedEventArgs e)

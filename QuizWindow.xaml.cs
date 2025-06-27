@@ -15,12 +15,9 @@ using System.Windows.Shapes;
 
 namespace ChatBot_Final
 {
-    /// <summary>
-    /// Interaction logic for QuizWindow.xaml
-    /// </summary>
     public partial class QuizWindow : Window
     {
-        private List<Question> questions = new List<Question>();
+        private List<Question> questions = new();
         private int currentQuestionIndex = 0;
         private int score = 0;
         private int selectedAnswer = -1;
@@ -30,6 +27,7 @@ namespace ChatBot_Final
             InitializeComponent();
             LoadQuestions();
             DisplayQuestion();
+            MainWindow.LogAction("Quiz started - user initiated the quiz.");
         }
 
         private void LoadQuestions()
@@ -46,7 +44,6 @@ namespace ChatBot_Final
                     CorrectOptionIndex = 1,
                     Explanation = "Each account should have a unique password to reduce risk." },
 
-                // Add 8 more...
                 new Question { Text = "What is two-factor authentication (2FA)?",
                     Options = new List<string>{ "An antivirus program", "A security method requiring two verification steps", "A password manager", "None of the above" },
                     CorrectOptionIndex = 1,
@@ -101,7 +98,7 @@ namespace ChatBot_Final
 
             for (int i = 0; i < question.Options.Count; i++)
             {
-                RadioButton option = new RadioButton
+                var option = new RadioButton
                 {
                     Content = question.Options[i],
                     Tag = i,
@@ -120,16 +117,20 @@ namespace ChatBot_Final
                 return;
             }
 
-            var correctIndex = questions[currentQuestionIndex].CorrectOptionIndex;
+            EvaluateAnswer();
+        }
 
-            if (selectedAnswer == correctIndex)
+        private void EvaluateAnswer()
+        {
+            var question = questions[currentQuestionIndex];
+            if (selectedAnswer == question.CorrectOptionIndex)
             {
                 score++;
-                txtFeedback.Text = "✅ Correct! " + questions[currentQuestionIndex].Explanation;
+                txtFeedback.Text = "✅ Correct! " + question.Explanation;
             }
             else
             {
-                txtFeedback.Text = $"❌ Incorrect. {questions[currentQuestionIndex].Explanation}";
+                txtFeedback.Text = $"❌ Incorrect. {question.Explanation}";
             }
 
             btnNext.Visibility = Visibility.Visible;
@@ -145,7 +146,9 @@ namespace ChatBot_Final
             }
             else
             {
-                MessageBox.Show($"Quiz complete! Your score: {score} / {questions.Count}", "Result");
+                string summary = $"Quiz complete! Score: {score}/{questions.Count}";
+                MessageBox.Show(summary, "Result");
+                MainWindow.LogAction($"Quiz completed with score {score}/{questions.Count}.");
                 Close();
             }
         }
