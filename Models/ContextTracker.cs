@@ -15,6 +15,8 @@ using System.Threading.Tasks;
         public bool AwaitingConfirmation { get; set; }
         public string CurrentTopic { get; set; }
         public int FollowUpCount { get; set; }
+
+        public string LastTopic => string.IsNullOrWhiteSpace(CurrentTopic) ? "None" : CurrentTopic;
         public void ResetConversationState()
         {
             AwaitingConfirmation = false;

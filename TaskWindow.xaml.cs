@@ -15,17 +15,19 @@ using System.Windows.Shapes;
 
 namespace ChatBot_Final
 {
-
     public partial class TaskWindow : Window
     {
+        // A static list to store all pending tasks shared across the application
         public static List<TaskItem> PendingTasks = new List<TaskItem>();
 
+        // Constructor: initializes the task window and refreshes the task list on load
         public TaskWindow()
         {
             InitializeComponent();
             RefreshTaskList();
         }
 
+        // Adds a new task to the list when the "Add Task" button is clicked
         private void AddTask_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(txtTitle.Text))
@@ -34,6 +36,7 @@ namespace ChatBot_Final
                 return;
             }
 
+            // Create a new task item using input fields
             TaskItem task = new TaskItem
             {
                 Title = txtTitle.Text,
@@ -42,11 +45,13 @@ namespace ChatBot_Final
                 IsCompleted = false
             };
 
+            // Add the task to the list and refresh the UI
             PendingTasks.Add(task);
             ClearInputs();
             RefreshTaskList();
         }
 
+        // Marks the selected task as completed
         private void CompleteTask_Click(object sender, RoutedEventArgs e)
         {
             if (lstTasks.SelectedIndex >= 0)
@@ -56,6 +61,7 @@ namespace ChatBot_Final
             }
         }
 
+        // Deletes the selected task from the list
         private void DeleteTask_Click(object sender, RoutedEventArgs e)
         {
             if (lstTasks.SelectedIndex >= 0)
@@ -65,15 +71,17 @@ namespace ChatBot_Final
             }
         }
 
+        // Updates the task list display in the UI
         private void RefreshTaskList()
         {
             lstTasks.Items.Clear();
             foreach (var task in PendingTasks)
             {
-                lstTasks.Items.Add(task.ToString());
+                lstTasks.Items.Add(task.ToString()); // Uses TaskItem's ToString method
             }
         }
 
+        // Clears input fields after a task is added
         private void ClearInputs()
         {
             txtTitle.Clear();
